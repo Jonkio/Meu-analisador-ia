@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
 # Configuração da página
-st.set_page_config(page_title="IA Analisadora Pro + Alerta", layout="wide")
+st.set_page_config(page_title="IA Analisadora Pro", layout="wide")
 
 # Estilos CSS para o Alerta Piscante
 st.markdown("""
@@ -23,7 +22,7 @@ st.markdown("""
     margin-bottom: 20px;
 }
 </style>
-""", unsafe_allow_stdio=True)
+""", unsafe_allow_html=True)
 
 # Inicialização da memória
 if 'historico' not in st.session_state:
@@ -76,9 +75,9 @@ if st.button("REGISTRAR RODADA", use_container_width=True):
     st.session_state.historico.insert(0, nova_rodada)
     st.rerun()
 
-# --- LÓGICA DE INTELIGÊNCIA ---
 st.divider()
 
+# --- LÓGICA DE INTELIGÊNCIA ---
 if len(st.session_state.historico) >= 5:
     ult_p = st.session_state.historico[0]["Padrao"]
     ocorrencias = []
@@ -93,42 +92,40 @@ if len(st.session_state.historico) >= 5:
         vencedor_frequente = max(contagem, key=contagem.get)
         porcentagem = (contagem[vencedor_frequente] / total) * 100
 
-        # --- FILTRO DE 80% E ALERTA ---
         if porcentagem >= 80 and vencedor_frequente != "Empate":
-            st.markdown(f'<div class="flash-button">🔥 OPORTUNIDADE DETECTADA: ENTRAR NO {vencedor_frequente.upper()} 🔥</div>', unsafe_allow_stdio=True)
+            st.markdown(f'<div class="flash-button">🔥 OPORTUNIDADE: ENTRAR NO {vencedor_frequente.upper()} 🔥</div>', unsafe_allow_html=True)
             st.balloons()
 
             st.write(f"### Confiança Estatística: {porcentagem:.1f}%")
-            st.write(f"Baseado em {total} vezes que este padrão se repetiu.")
+            st.write(f"Baseado em {total} repetições deste padrão.")
 
             c1, c2 = st.columns(2)
-            if c1.button("✅ ACERTEI (LUCRO)"):
+            if c1.button("✅ ACERTEI"):
                 st.session_state.acertos += 1
                 st.rerun()
-            if c2.button("❌ ERREI (LOSS)"):
+            if c2.button("❌ ERREI"):
                 st.session_state.erros += 1
                 st.rerun()
         else:
-            st.info(f"Análise: Padrão '{ult_p}' tem {porcentagem:.1f}% de chance para {vencedor_frequente}. Aguardando > 80%.")
+            st.info(f"Análise: Padrão '{ult_p}' favorece {vencedor_frequente} ({porcentagem:.1f}%). Aguardando > 80%.")
     else:
-        st.info("Padrão novo detectado. Coletando dados para futuras repetições...")
+        st.info("Padrão novo detectado. Coletando dados...")
 else:
-    st.info("Aguardando base de dados (mínimo 5 rodadas para análise)...")
+    st.info("Aguardando base de dados (mínimo 5 rodadas)...")
 
-# --- DASHBOARD LATERAL ---
+# --- DASHBOARD LATERAL (SEM PLOTLY) ---
 st.sidebar.title("📊 Performance")
 total_paps = st.session_state.acertos + st.session_state.erros
+
 if total_paps > 0:
     winrate = (st.session_state.acertos / total_paps) * 100
     st.sidebar.metric("Taxa de Assertividade", f"{winrate:.1f}%")
-
-    fig = px.pie(
-        values=[st.session_state.acertos, st.session_state.erros],
-        names=['Acertos', 'Erros'],
-        color_discrete_sequence=['#2ecc71', '#e74c3c'],
-        hole=0.4
-    )
-    st.sidebar.plotly_chart(fig, use_container_width=True)
+    
+    # Gráfico de Barras Nativo
+    chart_data = pd.DataFrame({
+        "Quantidade": [st.session_state.acertos, st.session_state.erros]
+    }, index=["Acertos", "Erros"])
+    st.sidebar.bar_chart(chart_data)
 
 if st.sidebar.button("Limpar Histórico"):
     st.session_state.historico = []
