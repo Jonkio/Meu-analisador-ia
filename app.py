@@ -1,8 +1,29 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # Configuração da página
-st.set_page_config(page_title="IA Analisadora", layout="wide")
+st.set_page_config(page_title="IA Analisadora Pro + Alerta", layout="wide")
+
+# Estilos CSS para o Alerta Piscante
+st.markdown("""
+<style>
+@keyframes blinker {
+    50% { opacity: 0; }
+}
+.flash-button {
+    background-color: #ff4b4b;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 10px;
+    animation: blinker 1s linear infinite;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+</style>
+""", unsafe_allow_stdio=True)
 
 # Inicialização da memória
 if 'historico' not in st.session_state:
@@ -13,34 +34,28 @@ if 'erros' not in st.session_state:
     st.session_state.erros = 0
 
 def categorizar(valor):
-    if valor in ['J', 'Q', 'K']: 
+    if valor in ['J', 'Q', 'K', 'A']: 
         return "Letra"
     v = int(valor)
-    if 1 <= v <= 6: 
-        return "Baixo"
-    if 7 <= v <= 8: 
-        return "Neutro"
-    if 9 <= v <= 10: 
-        return "Alto"
-    return "Desconhecido"
+    if 1 <= v <= 6: return "Baixo"
+    if 7 <= v <= 8: return "Neutro"
+    if 9 <= v <= 10: return "Alto"
+    return "Outro"
 
 def determinar_vencedor(v_az, v_ver):
-    pesos = {'J': 11, 'Q': 12, 'K': 13}
-    # Converte para int se for dígito, senão usa o peso da letra ou 0
+    pesos = {'J': 11, 'Q': 12, 'K': 13, 'A': 14}
     n_az = pesos.get(v_az, int(v_az) if v_az.isdigit() else 0)
     n_ver = pesos.get(v_ver, int(v_ver) if v_ver.isdigit() else 0)
-    
-    if n_az > n_ver: 
-        return "Azul"
-    if n_ver > n_az: 
-        return "Vermelho"
+
+    if n_az > n_ver: return "Azul"
+    if n_ver > n_az: return "Vermelho"
     return "Empate"
 
-st.title("🧠 IA de Análise de Padrões")
+st.title("🚀 IA Pro: Filtro 80% & Notificação")
 
-# --- Interface de Entrada ---
+# --- ÁREA DE ENTRADA ---
 col1, col2 = st.columns(2)
-opcoes = [str(i) for i in range(1, 11)] + ['J', 'Q', 'K']
+opcoes = [str(i) for i in range(1, 11)] + ['J', 'Q', 'K', 'A']
 
 with col1:
     val_az = st.selectbox("Lado Azul", opcoes)
@@ -55,40 +70,73 @@ if st.button("REGISTRAR RODADA", use_container_width=True):
     nova_rodada = {
         "Azul": f"{val_az} ({cat_az})",
         "Vermelho": f"{val_ver} ({cat_ver})",
-        "Resultado": f"{venc} Venceu",
+        "Resultado": venc,
         "Padrao": f"{cat_az}x{cat_ver}"
     }
     st.session_state.historico.insert(0, nova_rodada)
-    st.rerun() # Recarrega para atualizar a tabela e lógica
+    st.rerun()
 
+# --- LÓGICA DE INTELIGÊNCIA ---
 st.divider()
 
-# --- Lógica de Palpite ---
-if len(st.session_state.historico) >= 2:
+if len(st.session_state.historico) >= 5:
     ult_p = st.session_state.historico[0]["Padrao"]
-    sugestao = None
-    
-    # Busca no histórico se esse padrão já ocorreu antes
+    ocorrencias = []
+
     for i in range(1, len(st.session_state.historico) - 1):
         if st.session_state.historico[i+1]["Padrao"] == ult_p:
-            sugestao = st.session_state.historico[i]["Resultado"]
-            break
+            ocorrencias.append(st.session_state.historico[i]["Resultado"])
 
-    if sugestao:
-        st.subheader(f"🔮 Sugestão baseada no padrão: {sugestao}")
-        c1, c2 = st.columns(2)
-        if c1.button("✅ Acertei"):
-            st.session_state.acertos += 1
-            st.rerun()
-        if c2.button("❌ Errei"):
-            st.session_state.erros += 1
-            st.rerun()
+    if ocorrencias:
+        total = len(ocorrencias)
+        contagem = {v: ocorrencias.count(v) for v in set(ocorrencias)}
+        vencedor_frequente = max(contagem, key=contagem.get)
+        porcentagem = (contagem[vencedor_frequente] / total) * 100
 
-# --- Painel Lateral e Exibição ---
-st.sidebar.metric("Acertos", st.session_state.acertos)
-st.sidebar.metric("Erros", st.session_state.erros)
+        # --- FILTRO DE 80% E ALERTA ---
+        if porcentagem >= 80 and vencedor_frequente != "Empate":
+            st.markdown(f'<div class="flash-button">🔥 OPORTUNIDADE DETECTADA: ENTRAR NO {vencedor_frequente.upper()} 🔥</div>', unsafe_allow_stdio=True)
+            st.balloons()
 
+            st.write(f"### Confiança Estatística: {porcentagem:.1f}%")
+            st.write(f"Baseado em {total} vezes que este padrão se repetiu.")
+
+            c1, c2 = st.columns(2)
+            if c1.button("✅ ACERTEI (LUCRO)"):
+                st.session_state.acertos += 1
+                st.rerun()
+            if c2.button("❌ ERREI (LOSS)"):
+                st.session_state.erros += 1
+                st.rerun()
+        else:
+            st.info(f"Análise: Padrão '{ult_p}' tem {porcentagem:.1f}% de chance para {vencedor_frequente}. Aguardando > 80%.")
+    else:
+        st.info("Padrão novo detectado. Coletando dados para futuras repetições...")
+else:
+    st.info("Aguardando base de dados (mínimo 5 rodadas para análise)...")
+
+# --- DASHBOARD LATERAL ---
+st.sidebar.title("📊 Performance")
+total_paps = st.session_state.acertos + st.session_state.erros
+if total_paps > 0:
+    winrate = (st.session_state.acertos / total_paps) * 100
+    st.sidebar.metric("Taxa de Assertividade", f"{winrate:.1f}%")
+
+    fig = px.pie(
+        values=[st.session_state.acertos, st.session_state.erros],
+        names=['Acertos', 'Erros'],
+        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+        hole=0.4
+    )
+    st.sidebar.plotly_chart(fig, use_container_width=True)
+
+if st.sidebar.button("Limpar Histórico"):
+    st.session_state.historico = []
+    st.session_state.acertos = 0
+    st.session_state.erros = 0
+    st.rerun()
+
+# --- TABELA ---
 if st.session_state.historico:
-    st.write("### Histórico Recente")
-    df = pd.DataFrame(st.session_state.historico)
-    st.table(df[["Azul", "Vermelho", "Resultado"]])
+    st.subheader("📜 Histórico Recente")
+    st.table(pd.DataFrame(st.session_state.historico).head(10))
