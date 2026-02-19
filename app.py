@@ -2,65 +2,51 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# ==========================================
-# 1. CONFIGURAÇÃO E ESTILO
-# ==========================================
-st.set_page_config(page_title="IA ANALYZER - MODO AUTÔNOMO", layout="wide")
+# 1. Configuração e Estética Premium
+st.set_page_config(page_title="IA ANALYZER - MODO HÍBRIDO", layout="wide")
 
-def apply_custom_css():
-    st.markdown("""
-    <style>
-        .main { background-color: #0e1117; color: #ffffff; }
-        .stMetric { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
-        .card-oportunidade { 
-            background: linear-gradient(135deg, #065f46 0%, #064e3b 100%); 
-            padding: 20px; border-radius: 15px; text-align: center; border: 2px solid #10b981; 
-        }
-        .stats-box { 
-            background-color: #161b22; padding: 10px; border-radius: 8px; 
-            border-left: 4px solid #10b981; margin-bottom: 5px; 
-        }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    .stMetric { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+    .card-oportunidade { 
+        background: linear-gradient(135deg, #065f46 0%, #022c22 100%); 
+        padding: 25px; border-radius: 15px; text-align: center; border: 2px solid #10b981;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+    }
+    .stats-box { background-color: #161b22; padding: 12px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 8px; }
+    .carta-visual { display: inline-block; background: white; color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #3b82f6; }
+</style>
+""", unsafe_allow_html=True)
 
-# ==========================================
-# 2. LÓGICA DE NEGÓCIO (CORE)
-# ==========================================
+# 2. Inicialização de Memória
+if 'historico' not in st.session_state: st.session_state.historico = []
+if 'banca_atual' not in st.session_state: st.session_state.banca_atual = 1000.0
+if 'logs_banca' not in st.session_state: st.session_state.logs_banca = [1000.0]
+if 'performance_padroes' not in st.session_state: st.session_state.performance_padroes = {}
 
-def get_card_value(val):
-    """Converte o valor da carta para inteiro para comparação."""
-    pesos = {'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-    val_str = str(val).upper().strip()
-    if val_str in pesos:
-        return pesos[val_str]
-    return int(val_str) if val_str.isdigit() else 0
-
+# --- Funções de Lógica ---
 def categorizar(valor):
-    """Categoriza a carta conforme as faixas de valor."""
-    valor_limpo = str(valor).upper().strip()
-    if valor_limpo in ['J', 'Q', 'K', 'A']: return "Letra"
+    valor = str(valor).upper().strip()
+    if valor in ['J', 'Q', 'K', 'A']: return "Letra"
     try:
-        v = int(valor_limpo)
+        v = int(valor)
         if 1 <= v <= 6: return "Baixo"
         if 7 <= v <= 8: return "Neutro"
         if 9 <= v <= 10: return "Alto"
-    except ValueError:
-        pass
+    except: pass
     return "Outro"
 
 def determinar_vencedor(v_az, v_ver):
-    n_az = get_card_value(v_az)
-    n_ver = get_card_value(v_ver)
-    if n_az > n_ver: return "Azul"
-    if n_ver > n_az: return "Vermelho"
-    return "Empate"
+    pesos = {'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+    get_val = lambda x: pesos.get(str(x).upper(), int(x) if str(x).isdigit() else 0)
+    n_az, n_ver = get_val(v_az), get_val(v_ver)
+    return "Azul" if n_az > n_ver else "Vermelho" if n_ver > n_az else "Empate"
 
 def processar_vitoria_automatica(novo_vencedor):
-    """Valida se a previsão anterior foi correta e atualiza a banca."""
-    if len(st.session_state.historico) < 1:
-        return
-
-    # A previsão a ser validada está na última rodada inserida (índice 0)
+    if len(st.session_state.historico) < 1: return
+    
+    # Verifica a previsão deixada na última rodada registada
     ultima_rodada = st.session_state.historico[0]
     
     if "previsao_ia" in ultima_rodada:
@@ -70,120 +56,109 @@ def processar_vitoria_automatica(novo_vencedor):
         if padrao not in st.session_state.performance_padroes:
             st.session_state.performance_padroes[padrao] = {"win": 0, "loss": 0}
         
-        valor_aposta = st.session_state.banca_atual * 0.01
+        valor_aposta = st.session_state.banca_atual * 0.01 # Gestão de 1%
 
         if novo_vencedor == sugestao:
             st.session_state.performance_padroes[padrao]["win"] += 1
             st.session_state.banca_atual += valor_aposta
-            st.toast(f"✅ Green no padrão {padrao}!", icon="💰")
+            st.toast(f"✅ GREEN AUTOMÁTICO! (+R${valor_aposta:.2f})", icon="💰")
         elif novo_vencedor != "Empate":
             st.session_state.performance_padroes[padrao]["loss"] += 1
             st.session_state.banca_atual -= valor_aposta
-            st.toast(f"❌ Loss no padrão {padrao}", icon="📉")
+            st.toast(f"❌ LOSS DETECTADO! (-R${valor_aposta:.2f})", icon="📉")
         
         st.session_state.logs_banca.append(st.session_state.banca_atual)
 
-# ==========================================
-# 3. INICIALIZAÇÃO DO ESTADO
-# ==========================================
-def init_session():
-    defaults = {
-        'historico': [],
-        'banca_atual': 1000.0,
-        'logs_banca': [1000.0],
-        'performance_padroes': {}
-    }
-    for key, val in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = val
+# --- Layout Superior ---
+st.title("🛡️ IA ANALYZER: REGISTO MANUAL INTELIGENTE")
 
-# ==========================================
-# 4. INTERFACE DO USUÁRIO (UI)
-# ==========================================
-def main():
-    apply_custom_css()
-    init_session()
+col_input, col_pred = st.columns([1, 1.5])
 
-    st.title("🛡️ IA ANALYZER: AUTO-TRACKING")
-
-    col_in, col_pred = st.columns([1, 1.5])
-
-    with col_in:
-        st.subheader("📥 Abastecer Resultados")
-        entrada = st.text_area("Cole os dados (Ex: 10 K 5 2)", height=100)
+with col_input:
+    st.subheader("📥 Abastecer Resultados")
+    opcoes = [str(i) for i in range(1, 11)] + ['J', 'Q', 'K', 'A']
+    
+    c1, c2 = st.columns(2)
+    val_az = c1.selectbox("Lado Azul", opcoes)
+    val_ver = c2.selectbox("Lado Vermelho", opcoes)
+    
+    if st.button("REGISTAR RODADA", use_container_width=True):
+        venc_atual = determinar_vencedor(val_az, val_ver)
         
-        if st.button("ATUALIZAR", use_container_width=True):
-            dados = entrada.replace(',', ' ').split()
+        # 1. Valida automaticamente se a previsão anterior bateu com este novo dado
+        processar_vitoria_automatica(venc_atual)
+        
+        # 2. Cria a nova rodada
+        padrao_atual = f"{categorizar(val_az)}x{categorizar(val_ver)}"
+        nova_rodada = {
+            "Hora": datetime.now().strftime("%H:%M:%S"),
+            "Azul": val_az, "Vermelho": val_ver,
+            "Vencedor": venc_atual,
+            "Padrao": padrao_atual
+        }
+        
+        # 3. Gera a previsão para a PRÓXIMA rodada (Backtest em tempo real)
+        matches = [h for h in st.session_state.historico if h["Padrao"] == padrao_atual]
+        if matches:
+            venc_frequente = max(set([m["Vencedor"] for m in matches]), key=[m["Vencedor"] for m in matches].count)
+            nova_rodada["previsao_ia"] = venc_frequente
             
-            # Processa em pares (Azul e Vermelho)
-            for i in range(0, len(dados) - 1, 2):
-                v_az, v_ver = dados[i], dados[i+1]
-                venc_atual = determinar_vencedor(v_az, v_ver)
-                
-                # Valida previsão anterior antes de registrar a nova
-                processar_vitoria_automatica(venc_atual)
-                
-                # Gera padrão e busca previsão
-                padrao_nome = f"{categorizar(v_az)}x{categorizar(v_ver)}"
-                
-                # Busca tendência no histórico
-                matches = [h for h in st.session_state.historico if h["Padrao"] == padrao_nome]
-                previsao = None
-                if matches:
-                    vencedores = [m["Vencedor"] for m in matches if m["Vencedor"] != "Empate"]
-                    if vencedores:
-                        previsao = max(set(vencedores), key=vencedores.count)
+        st.session_state.historico.insert(0, nova_rodada)
+        st.rerun()
 
-                nova_rodada = {
-                    "Hora": datetime.now().strftime("%H:%M"),
-                    "Azul": v_az, "Vermelho": v_ver,
-                    "Vencedor": venc_atual,
-                    "Padrao": padrao_nome,
-                    "previsao_ia": previsao
-                }
-                
-                st.session_state.historico.insert(0, nova_rodada)
-            st.rerun()
+with col_pred:
+    st.subheader("🔮 Previsão para a Próxima")
+    if st.session_state.historico:
+        ult = st.session_state.historico[0]
+        if "previsao_ia" in ult:
+            st.markdown(f"""
+                <div class="card-oportunidade">
+                    <p style='margin:0; font-size: 14px; opacity: 0.8;'>Padrão Detetado: {ult['Padrao']}</p>
+                    <h1 style='margin: 10px 0; font-size: 45px; color: #10b981;'>{ult['previsao_ia'].upper()}</h1>
+                    <p style='margin:0;'>Entre na cor acima agora!</p>
+                    <small style='opacity: 0.6;'>A validação do Green será automática ao registar o próximo resultado.</small>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("A aguardar repetição de padrão para gerar palpite...")
+    else:
+        st.info("Registe a primeira rodada para iniciar a análise.")
 
-    with col_pred:
-        if st.session_state.historico:
-            ult = st.session_state.historico[0]
-            if ult.get("previsao_ia"):
-                st.markdown(f"""
-                    <div class="card-oportunidade">
-                        <h3>PRÓXIMA ENTRADA SUGERIDA</h3>
-                        <h1 style='color: #10b981;'>{ult['previsao_ia'].upper()}</h1>
-                        <p>Padrão Detectado: <b>{ult['Padrao']}</b></p>
-                        <small>Aguardando resultado para validação...</small>
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.info("Padrão novo detectado. Aguardando mais dados para gerar previsão.")
+st.divider()
 
+# --- Gráficos e Tabelas ---
+col_graf, col_perf = st.columns([2, 1])
+
+with col_graf:
+    st.subheader("📈 Evolução da Banca (R$)")
+    st.line_chart(st.session_state.logs_banca)
+
+with col_perf:
+    st.subheader("📊 Eficiência por Padrão")
+    if st.session_state.performance_padroes:
+        items = []
+        for p, s in st.session_state.performance_padroes.items():
+            total = s['win'] + s['loss']
+            winrate = (s['win'] / total * 100) if total > 0 else 0
+            items.append({"Padrão": p, "✅": s['win'], "❌": s['loss'], "%": f"{winrate:.0f}%"})
+        st.table(pd.DataFrame(items))
+
+# --- Histórico ---
+st.subheader("📜 Log de Atividade")
+if st.session_state.historico:
+    for h in st.session_state.historico[:5]:
+        st.markdown(f"""
+        <div class="stats-box">
+            {h['Hora']} | Azul: <span class="carta-visual">{h['Azul']}</span> Vermelho: <span class="carta-visual">{h['Vermelho']}</span> | 
+            <b>Vencedor: {h['Vencedor']}</b> | Padrão: {h['Padrao']}
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- Sidebar ---
+with st.sidebar:
+    st.header("⚙️ Painel de Controlo")
+    st.metric("Saldo Disponível", f"R$ {st.session_state.banca_atual:.2f}")
     st.divider()
-
-    # Dashboard de Performance
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        st.subheader("📈 Evolução da Banca")
-        st.line_chart(st.session_state.logs_banca)
-        
-    with c2:
-        st.subheader("📊 Ranking de Padrões")
-        if st.session_state.performance_padroes:
-            df_perf = pd.DataFrame([
-                {"Padrão": p, "Win": s['win'], "Loss": s['loss']} 
-                for p, s in st.session_state.performance_padroes.items()
-            ])
-            st.dataframe(df_perf, hide_index=True, use_container_width=True)
-
-    # Sidebar lateral
-    with st.sidebar:
-        st.header("Configurações")
-        st.metric("Saldo Atual", f"R$ {st.session_state.banca_atual:.2f}")
-        if st.button("Limpar Histórico"):
-            st.session_state.clear()
-            st.rerun()
-
-if __name__ == "__main__":
-    main()
+    if st.button("LIMPAR TUDO"):
+        st.session_state.clear()
+        st.rerun()
