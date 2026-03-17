@@ -1,141 +1,148 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from datetime import datetime
-import re
 
-# 1. Configuração de Layout e Performance
-st.set_page_config(page_title="IA ANALYZER - MODO FIXO", layout="wide")
+# 1. Configuração de Layout Ultra-Wide
+st.set_page_config(page_title="IA ANALYZER - ÁPICE ABSOLUTO", layout="wide")
 
 def play_sound():
-    sound_file = "https://www.soundjay.com/buttons/button-3.mp3"
-    st.markdown(f'<audio autoplay><source src="{sound_file}" type="audio/mp3"></audio>', unsafe_allow_html=True)
+    st.markdown('<audio autoplay><source src="https://www.soundjay.com/buttons/button-3.mp3" type="audio/mp3"></audio>', unsafe_allow_html=True)
 
 st.markdown("""
 <style>
-    .main { background-color: #064e3b; color: #ffffff; }
-    .card-fixo { 
-        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); 
-        padding: 30px; border-radius: 20px; text-align: center; color: white;
-        border: 4px solid #10b981; box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    .main { background-color: #020617; color: #ffffff; }
+    .card-apex { 
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); 
+        padding: 25px; border-radius: 20px; text-align: center; color: white;
+        border: 2px solid #6366f1; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
     }
-    .radar-tie { background: #f59e0b; color: white; padding: 8px; border-radius: 10px; font-weight: bold; margin-top: 10px; }
-    .bola { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin: 0 2px; }
+    .monitor-item { background: rgba(30, 41, 59, 0.7); padding: 12px; border-radius: 8px; border-left: 4px solid #6366f1; margin-bottom: 8px; }
+    .bola { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin: 0 2px; }
     .casa { background-color: #ef4444; } .fora { background-color: #3b82f6; } .empate { background-color: #fbbf24; }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Inicialização do Baralho e Memória (Sem Variáveis de Gale)
+# 2. Inicialização de Memória Avançada
 if 'deck_count' not in st.session_state:
     st.session_state.deck_count = {str(c): 32 for c in range(2, 11)}
     for f in ['J', 'Q', 'K', 'A']: st.session_state.deck_count[f] = 32
 
-for key in ['historico', 'banca_atual', 'greens_dia', 'reds_dia', 'rodadas_lock']:
+for key in ['historico', 'banca_atual', 'max_seq_home', 'max_seq_away', 'rodadas_lock', 'wins_sessao', 'total_sinais']:
     if key not in st.session_state:
         if 'banca' in key: st.session_state[key] = 3000.0
-        elif 'lock' in key: st.session_state[key] = 0
         else: st.session_state[key] = [] if 'historico' in key else 0
 
-# --- MOTOR DE ANÁLISE DE ALTA PRECISÃO (SEM GALE) ---
+# --- MOTORES DE INTELIGÊNCIA V5 ---
 
-def detectar_radar_empate(dados, deck):
-    if len(dados) < 3: return False
-    dif_recente = abs(int(dados[0]['v_h']) - int(dados[0]['v_a']))
-    total = sum(deck.values())
-    if total == 0: return False
-    grupos = [['2','3','4'], ['5','6','7'], ['8','9','10'], ['J','Q','K','A']]
-    concentracao = any([(sum([deck[c] for c in g]) / total) > 0.40 for g in grupos])
-    return dif_recente <= 1 and concentracao
+def calcular_indice_volatilidade(dados):
+    if len(dados) < 10: return 50 
+    acertos = sum([1 for h in dados[:10] if h.get('status') == 'Green'])
+    return (acertos / 10) * 100
 
-def analisar_mago_fixo(dados):
-    # Exige mais dados para sinalizar sem Gale (Segurança Máxima)
+def analisar_mago_v5(dados, deck):
+    volatilidade = calcular_indice_volatilidade(dados)
+    if volatilidade < 40: return None # Filtro Anti-Recolhimento
+    
     if len(dados) < 6 or st.session_state.rodadas_lock > 0: return None
     
-    v = [h['Vencedor'][0] for h in dados[:10]]
+    v = [h['Vencedor'][0] for h in dados[:12] if h.get('Vencedor')]
     v_str = "".join(v)
-    forca_h = sum([int(h['v_h']) for h in dados[:5]]) / 5
-    forca_a = sum([int(h['v_a']) for h in dados[:5]]) / 5
-
-    # Critérios Rigorosos de Convergência
-    if v_str.startswith("HHA") and forca_h > (forca_a + 1.5):
-        return {"sug": "Home", "est": "Escala 2x1 + Superioridade", "conf": 96}
-    if v_str.startswith("AAH") and forca_a > (forca_h + 1.5):
-        return {"sug": "Away", "est": "Escala 2x1 + Superioridade", "conf": 96}
-    if v_str.startswith("HHHAA") or v_str.startswith("AAAHH"):
-        return {"sug": ("Home" if v[0]=='A' else "Away"), "est": "Escala 3x2x1", "conf": 92}
+    p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
     
+    # Ruptura de Máxima Histórica
+    seq = 1
+    for i in range(len(v)-1):
+        if v[i] == v[i+1] and v[i] != 'E': seq += 1
+        else: break
+    if v[0] == 'H' and seq >= st.session_state.max_seq_home and seq >= 4: 
+        return {"sug": "Away", "est": "Ruptura de Máxima", "conf": 97}
+    if v[0] == 'A' and seq >= st.session_state.max_seq_away and seq >= 4: 
+        return {"sug": "Home", "est": "Ruptura de Máxima", "conf": 97}
+
+    # Escala + Filtro Físico (Deck High)
+    total_cartas = sum(deck.values())
+    altas_restantes = sum([deck[c] for c in ['10', 'J', 'Q', 'K', 'A']])
+    prob_alta = (altas_restantes / total_cartas) * 100 if total_cartas > 0 else 0
+    
+    if v_str.startswith("HHA") and prob_alta > 40: return {"sug": "Home", "est": "Escala + Deck High", "conf": 95}
+    if v_str.startswith("AAH") and prob_alta > 40: return {"sug": "Away", "est": "Escala + Deck High", "conf": 95}
+
     return None
 
-# --- INTERFACE ---
-with st.sidebar:
-    st.header("🛡️ Gestão de Banca")
-    st.session_state.banca_atual = st.number_input("Banca Atual R$", value=float(st.session_state.banca_atual))
-    perc = st.slider("Aposta Fixa (%)", 0.5, 5.0, 1.0) / 100 # Sugestão 1% para banca de 3k
-    st.divider()
-    st.metric("Greens (Mão Fixa)", st.session_state.greens_dia)
-    st.metric("Reds", st.session_state.reds_dia)
-    if st.button("RESETAR SESSÃO"): st.session_state.clear(); st.rerun()
+# --- INTERFACE DE COMANDO ---
+st.title("⚽ FOOTBALL STUDIO IA - ÁPICE V5")
 
-st.title("⚽ FOOTBALL STUDIO IA - MODO MAGO FIXO")
+c_input, c_sinal, c_apex = st.columns([1, 1.2, 1])
 
-c_in, c_prev = st.columns([1, 1.4])
-
-with c_in:
-    st.subheader("📥 Registro")
-    cartas_op = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-    h_v = st.selectbox("Home", cartas_op); a_v = st.selectbox("Away", cartas_op)
-    
+with c_input:
+    st.subheader("📥 Terminal de Dados")
+    cartas = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
+    h_c = st.selectbox("Casa", cartas); a_c = st.selectbox("Fora", cartas)
     if st.button("REGISTRAR JOGADA", use_container_width=True):
         p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
-        v_h, v_a = p_map[h_v], p_map[a_v]
+        v_h, v_a = p_map[h_c], p_map[a_c]
         venc = "Home" if v_h > v_a else "Away" if v_a > v_h else "Empate"
         
-        # Baixa no deck e Lock
-        st.session_state.deck_count[h_v] -= 1
-        st.session_state.deck_count[a_v] -= 1
+        st.session_state.deck_count[h_c] -= 1
+        st.session_state.deck_count[a_c] -= 1
+        
+        # Gestão de Máximas
+        if venc == 'Home': 
+            curr_h = 1
+            for h in st.session_state.historico:
+                if h['Vencedor'] == 'Home': curr_h += 1
+                else: break
+            if curr_h > st.session_state.max_seq_home: st.session_state.max_seq_home = curr_h
+        elif venc == 'Away':
+            curr_a = 1
+            for h in st.session_state.historico:
+                if h['Vencedor'] == 'Away': curr_a += 1
+                else: break
+            if curr_a > st.session_state.max_seq_away: st.session_state.max_seq_away = curr_a
+
+        status = "None"
+        if st.session_state.historico and "prev" in st.session_state.historico[0]:
+            st.session_state.total_sinais += 1
+            if venc == st.session_state.historico[0]["prev"]:
+                status = "Green"; st.session_state.wins_sessao += 1
+                st.session_state.banca_atual += (st.session_state.banca_atual * 0.01)
+            elif venc != "Empate":
+                status = "Red"; st.session_state.banca_atual -= (st.session_state.banca_atual * 0.01)
+
         if venc == "Empate": st.session_state.rodadas_lock = 2
         elif st.session_state.rodadas_lock > 0: st.session_state.rodadas_lock -= 1
         
-        # Contagem de Win/Loss Simples (Sem Gale)
-        if st.session_state.historico and "prev" in st.session_state.historico[0]:
-            if venc == st.session_state.historico[0]["prev"]:
-                st.session_state.greens_dia += 1
-                st.session_state.banca_atual += (st.session_state.banca_atual * perc)
-            elif venc != "Empate":
-                st.session_state.reds_dia += 1
-                st.session_state.banca_atual -= (st.session_state.banca_atual * perc)
-
-        st.session_state.historico.insert(0, {"Vencedor": venc, "H": h_v, "A": a_v, "v_h": v_h, "v_a": v_a, "Hora": datetime.now().strftime("%H:%M")})
+        st.session_state.historico.insert(0, {"Vencedor": venc, "H": h_c, "A": a_c, "status": status})
         st.rerun()
 
-with c_prev:
-    st.subheader("🔮 Filtro de Elite (Aposta Fixa)")
-    sinal = analisar_mago_fixo(st.session_state.historico)
-    zona_tie = detectar_radar_empate(st.session_state.historico, st.session_state.deck_count)
-    
-    if st.session_state.rodadas_lock > 0:
-        st.info(f"🔎 MODO OBSERVAÇÃO: {st.session_state.rodadas_lock} rodadas restantes.")
+with c_sinal:
+    st.subheader("🔮 Processamento Elite")
+    sinal = analisar_mago_v5(st.session_state.historico, st.session_state.deck_count)
+    if st.session_state.rodadas_lock > 0: st.warning("⚠️ MESA EM LOCK (PÓS-EMPATE)")
     elif sinal:
-        cor_s = "#ef4444" if sinal['sug'] == "Home" else "#3b82f6"
-        st.markdown(f"""
-            <div class="card-fixo">
-                <small>CONVERGÊNCIA DE ALTA ASSERTIVIDADE</small>
-                <h1 style="color: {cor_s}; font-size: 75px; margin: 0;">{sinal['sug'].upper()}</h1>
-                <p>Estratégia: <b>{sinal['est']}</b></p>
-                <p>Valor Recomendado: <b>R$ {(st.session_state.banca_atual * perc):.2f}</b></p>
-                {f'<div class="radar-tie">🎯 RADAR DE EMPATE: COBRIR COM 15% (R$ {(st.session_state.banca_atual * perc * 0.15):.2f})</div>' if zona_tie else ""}
-            </div>
-        """, unsafe_allow_html=True)
-        play_sound()
-        st.session_state.historico[0]["prev"] = sinal['sug']
-    elif zona_tie:
-        st.markdown(f'<div class="radar-tie" style="text-align:center; padding:20px;">ZONA DE EMPATE DETECTADA<br>Aposta sugerida: R$ {(st.session_state.banca_atual * perc * 0.2):.2f}</div>', unsafe_allow_html=True)
-    else:
-        st.info("🔎 Monitorando padrões rigorosos para entrada fixa...")
+        cor = "#ef4444" if sinal['sug'] == "Home" else "#3b82f6"
+        st.markdown(f'<div class="card-apex"><small>{sinal["est"]}</small><h1 style="color:{cor}; font-size:65px; margin:0;">{sinal["sug"].upper()}</h1><p>Confiança: {sinal["conf"]}%</p></div>', unsafe_allow_html=True)
+        play_sound(); st.session_state.historico[0]["prev"] = sinal['sug']
+    else: st.info("Aguardando Convergência de Alta Probabilidade...")
+
+with c_apex:
+    st.subheader("🛰️ Monitor de Ápice")
+    vol = calcular_indice_volatilidade(st.session_state.historico)
+    st.write(f"📊 **Calor da Mesa (Respeito a Padrões):** {vol}%")
+    st.progress(vol/100)
+    
+    rate = (st.session_state.wins_sessao / st.session_state.total_sinais * 100) if st.session_state.total_sinais > 0 else 0
+    st.markdown(f"""
+        <div class="monitor-item">🏷️ <b>Assertividade Real:</b> {rate:.1f}%</div>
+        <div class="monitor-item">🐉 <b>Máxima Home:</b> {st.session_state.max_seq_home}</div>
+        <div class="monitor-item">🐉 <b>Máxima Away:</b> {st.session_state.max_seq_away}</div>
+        <div class="monitor-item">💰 <b>Saldo Atual:</b> R$ {st.session_state.banca_atual:.2f}</div>
+    """, unsafe_allow_html=True)
 
 st.divider()
 if st.session_state.historico:
-    st.subheader("🕒 Roadmap Recente")
     cols = st.columns(12)
     for i, h in enumerate(st.session_state.historico[:12]):
-        cor = "casa" if h['Vencedor'] == "Home" else "fora" if h['Vencedor'] == "Away" else "empate"
-        cols[i].markdown(f"<div style='text-align:center'><span class='bola {cor}'></span><br><small>{h['H']}x{h['A']}</small></div>", unsafe_allow_html=True)
+        c = "casa" if h['Vencedor'] == 'Home' else 'fora' if h['Vencedor'] == 'Away' else 'empate'
+        cols[i].markdown(f"<div style='text-align:center'><span class='bola {c}'></span><br><small>{h['H']}x{h['A']}</small></div>", unsafe_allow_html=True)
