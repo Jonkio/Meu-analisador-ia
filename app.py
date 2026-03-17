@@ -4,49 +4,44 @@ import numpy as np
 from datetime import datetime
 
 # 1. Configuração de Layout
-st.set_page_config(page_title="IA ANALYZER - ALTA VISIBILIDADE", layout="wide")
+st.set_page_config(page_title="IA ANALYZER - V6.2 PRO", layout="wide")
 
 st.markdown("""
 <style>
-    /* Fundo Neutro e Legível */
     .stApp { background-color: #f1f5f9; color: #1e293b; }
-    
-    /* Card de Sinal - Fundo Branco com Borda Forte */
     .card-sinal-on { 
         background-color: #ffffff; 
         padding: 30px; border-radius: 15px; text-align: center;
         border: 5px solid #22c55e; 
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
-    
-    /* Texto em Preto/Cinza Escuro para Leitura */
     h1, h2, h3, p, span { color: #1e293b !important; }
-    
     .monitor-item { 
         background-color: #ffffff; padding: 15px; border-radius: 10px; 
         margin-bottom: 10px; border: 2px solid #e2e8f0;
         font-weight: bold; font-size: 18px;
     }
-    
     .scanner-box { 
         background-color: #ffffff; padding: 20px; border-radius: 12px; 
         border: 2px solid #cbd5e1; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
     }
-    
     .bola { height: 14px; width: 14px; border-radius: 50%; display: inline-block; margin: 0 3px; border: 1px solid #94a3b8; }
-    .casa { background-color: #dc2626; } /* Vermelho Vivo */
-    .fora { background-color: #2563eb; } /* Azul Vivo */
-    .empate { background-color: #eab308; } /* Amarelo Vivo */
-    
-    /* Botões em Destaque */
+    .casa { background-color: #dc2626; } 
+    .fora { background-color: #2563eb; } 
+    .empate { background-color: #eab308; } 
     .stButton>button {
         background-color: #1e293b !important; color: white !important;
         font-weight: bold !important; border-radius: 8px !important;
     }
+    /* Estilo para as caixas de input de banca no topo */
+    .banca-input-box {
+        background-color: #ffffff; padding: 15px; border-radius: 10px;
+        border: 2px solid #6366f1; margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Inicialização de Memória (Mantendo toda a lógica intacta)
+# 2. Inicialização de Memória Permanente
 for key in ['historico', 'banca_inicial', 'banca_atual', 'max_seq_home', 'max_seq_away', 'rodadas_lock', 
             'wins_sessao', 'total_sinais', 'sessao_ativa', 'seq_greens_atual', 'maior_seq_greens', 'deck_count']:
     if key not in st.session_state:
@@ -80,8 +75,22 @@ def analisar_mago_final(dados):
 
 # --- INTERFACE ---
 if st.session_state.sessao_ativa:
-    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.1 PRO</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.2 PRO</h1>", unsafe_allow_html=True)
     
+    # NOVA ÁREA DE GESTÃO NO TOPO (A PEDIDO)
+    col_gestao1, col_gestao2, col_gestao3 = st.columns([1, 1, 1.4])
+    with col_gestao1:
+        st.session_state.banca_inicial = st.number_input("VALOR DA BANCA (R$)", value=float(st.session_state.banca_inicial), step=100.0)
+    with col_gestao2:
+        perfil = st.selectbox("MODO DE JOGO", ["CALMA (0.5%)", "MODERADA (1%)", "ATACANTE (2.5%)"], index=1)
+    with col_gestao3:
+        st.write("") # Alinhamento
+        if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True):
+            st.session_state.sessao_ativa = False
+            st.rerun()
+
+    st.divider()
+
     c_in, c_sinal, c_apex = st.columns([1, 1.4, 1])
 
     with c_in:
@@ -96,15 +105,17 @@ if st.session_state.sessao_ativa:
             st.session_state.deck_count[h_c] -= 1; st.session_state.deck_count[a_c] -= 1
             
             status = "None"
+            risco_val = 0.005 if "CALMA" in perfil else 0.01 if "MODERADA" in perfil else 0.025
+            
             if st.session_state.historico and "prev" in st.session_state.historico[0]:
                 st.session_state.total_sinais += 1
                 if venc == st.session_state.historico[0]["prev"]:
                     status = "Green"; st.session_state.wins_sessao += 1; st.session_state.seq_greens_atual += 1
                     st.session_state.maior_seq_greens = max(st.session_state.maior_seq_greens, st.session_state.seq_greens_atual)
-                    st.session_state.banca_atual += (st.session_state.banca_atual * 0.01)
+                    st.session_state.banca_atual += (st.session_state.banca_atual * risco_val)
                 elif venc != "Empate":
                     status = "Red"; st.session_state.seq_greens_atual = 0
-                    st.session_state.banca_atual -= (st.session_state.banca_atual * 0.01)
+                    st.session_state.banca_atual -= (st.session_state.banca_atual * risco_val)
             
             if venc == "Empate": st.session_state.rodadas_lock = 2
             elif st.session_state.rodadas_lock > 0: st.session_state.rodadas_lock -= 1
@@ -137,11 +148,9 @@ if st.session_state.sessao_ativa:
             <div class="monitor-item" style="color:#16a34a !important;">📈 LUCRO: R$ {lucro:.2f}</div>
             <div class="monitor-item">🔥 SEQUÊNCIA: {st.session_state.seq_greens_atual} ✅</div>
         """, unsafe_allow_html=True)
-        if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True): st.session_state.sessao_active = False
 
     st.divider()
     
-    # SCANNER DE PREDOMINÂNCIA (ALTO CONTRASTE)
     if st.session_state.historico:
         st.subheader("🔍 SCANNER DE CARTAS (Últimas 12)")
         col_h, col_a = st.columns(2)
@@ -174,7 +183,7 @@ if st.session_state.sessao_ativa:
             cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px; background:white;'><span class='bola {c}'></span><br><b>{h['H']}x{h['A']}</b></div>", unsafe_allow_html=True)
 
 else:
-    # TELA DE RELATÓRIO SIMPLIFICADA
+    # TELA DE RELATÓRIO
     lucro = st.session_state.banca_atual - st.session_state.banca_inicial
     st.markdown(f"""
         <div style="text-align:center; padding:50px; background:white; border:5px solid #16a34a; border-radius:20px;">
@@ -182,6 +191,9 @@ else:
             <hr>
             <h2>LUCRO LÍQUIDO: R$ {lucro:.2f}</h2>
             <h3>MELHOR SEQUÊNCIA: {st.session_state.maior_seq_greens} ✅</h3>
-            <p>Clique em Reiniciar no GitHub para voltar.</p>
+            <p>Clique no botão 'REINICIAR APP' na barra lateral para voltar.</p>
         </div>
     """, unsafe_allow_html=True)
+    if st.sidebar.button("🔄 REINICIAR APP"):
+        st.session_state.clear()
+        st.rerun()
