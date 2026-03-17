@@ -3,36 +3,50 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-# 1. Configuração de Layout Ultra-Wide
-st.set_page_config(page_title="IA ANALYZER - COCKPIT V6.0", layout="wide")
+# 1. Configuração de Layout
+st.set_page_config(page_title="IA ANALYZER - ALTA VISIBILIDADE", layout="wide")
 
 st.markdown("""
 <style>
-    .main { background-color: #020617; color: #ffffff; }
+    /* Fundo Neutro e Legível */
+    .stApp { background-color: #f1f5f9; color: #1e293b; }
     
-    /* Card de Sinal com Animação de Brilho */
+    /* Card de Sinal - Fundo Branco com Borda Forte */
     .card-sinal-on { 
-        background: linear-gradient(135deg, #065f46 0%, #064e3b 100%); 
-        padding: 30px; border-radius: 20px; text-align: center;
-        border: 4px solid #10b981; box-shadow: 0 0 30px rgba(16, 185, 129, 0.4);
-        animation: glow 1.5s infinite alternate;
-    }
-    @keyframes glow {
-        from { box-shadow: 0 0 10px #10b981; }
-        to { box-shadow: 0 0 30px #10b981; }
+        background-color: #ffffff; 
+        padding: 30px; border-radius: 15px; text-align: center;
+        border: 5px solid #22c55e; 
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
     
-    .monitor-item { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-bottom: 3px solid #6366f1; }
-    .scanner-box { background: rgba(15, 23, 42, 0.8); padding: 15px; border-radius: 12px; border: 1px solid #334155; }
-    .bola { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin: 0 2px; }
-    .casa { background-color: #ef4444; } .fora { background-color: #3b82f6; } .empate { background-color: #fbbf24; }
+    /* Texto em Preto/Cinza Escuro para Leitura */
+    h1, h2, h3, p, span { color: #1e293b !important; }
     
-    /* Títulos Estilizados */
-    .h-title { font-size: 24px; font-weight: bold; background: -webkit-linear-gradient(#fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .monitor-item { 
+        background-color: #ffffff; padding: 15px; border-radius: 10px; 
+        margin-bottom: 10px; border: 2px solid #e2e8f0;
+        font-weight: bold; font-size: 18px;
+    }
+    
+    .scanner-box { 
+        background-color: #ffffff; padding: 20px; border-radius: 12px; 
+        border: 2px solid #cbd5e1; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .bola { height: 14px; width: 14px; border-radius: 50%; display: inline-block; margin: 0 3px; border: 1px solid #94a3b8; }
+    .casa { background-color: #dc2626; } /* Vermelho Vivo */
+    .fora { background-color: #2563eb; } /* Azul Vivo */
+    .empate { background-color: #eab308; } /* Amarelo Vivo */
+    
+    /* Botões em Destaque */
+    .stButton>button {
+        background-color: #1e293b !important; color: white !important;
+        font-weight: bold !important; border-radius: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Inicialização de Memória
+# 2. Inicialização de Memória (Mantendo toda a lógica intacta)
 for key in ['historico', 'banca_inicial', 'banca_atual', 'max_seq_home', 'max_seq_away', 'rodadas_lock', 
             'wins_sessao', 'total_sinais', 'sessao_ativa', 'seq_greens_atual', 'maior_seq_greens', 'deck_count']:
     if key not in st.session_state:
@@ -43,7 +57,6 @@ for key in ['historico', 'banca_inicial', 'banca_atual', 'max_seq_home', 'max_se
             for f in ['J', 'Q', 'K', 'A']: st.session_state.deck_count[f] = 32
         else: st.session_state[key] = [] if 'historico' in key else 0
 
-# --- LÓGICA DE CATEGORIZAÇÃO ---
 def categorizar_carta(carta):
     if carta in ['2', '3', '4', '5']: return "Baixa"
     if carta in ['6', '7', '8', '9']: return "Neutra"
@@ -51,58 +64,48 @@ def categorizar_carta(carta):
     if carta in ['J', 'Q', 'K', 'A']: return "Letra"
     return "N/A"
 
-# --- MOTOR DE ANÁLISE ---
-def analisar_mago_v6(dados):
+def analisar_mago_final(dados):
     if len(dados) < 5 or st.session_state.rodadas_lock > 0: return None
     v = [h['Vencedor'][0] for h in dados if h.get('Vencedor')]
     v_str = "".join(v[:12])
-    
-    # Ruptura de Máxima
     seq = 1
     for i in range(len(v)-1):
         if v[i] == v[i+1] and v[i] != 'E': seq += 1
         else: break
-    
-    if v[0] == 'H' and seq >= st.session_state.max_seq_home and seq >= 4: return {"sug": "Away", "est": "RUPTURA DE MÁXIMA", "conf": 97}
-    if v[0] == 'A' and seq >= st.session_state.max_seq_away and seq >= 4: return {"sug": "Home", "est": "RUPTURA DE MÁXIMA", "conf": 97}
-    
-    # Padrão Clássico 2x1
+    if v[0] == 'H' and seq >= st.session_state.max_seq_home and seq >= 4: return {"sug": "Away", "est": "QUEBRA DE MÁXIMA", "conf": 97}
+    if v[0] == 'A' and seq >= st.session_state.max_seq_away and seq >= 4: return {"sug": "Home", "est": "QUEBRA DE MÁXIMA", "conf": 97}
     if v_str.startswith("HHA"): return {"sug": "Home", "est": "ESCALA 2x1", "conf": 94}
     if v_str.startswith("AAH"): return {"sug": "Away", "est": "ESCALA 2x1", "conf": 94}
     return None
 
 # --- INTERFACE ---
 if st.session_state.sessao_ativa:
-    st.markdown("<h1 style='text-align: center; color: #6366f1;'>⚽ COMMAND CENTER - V6.0 PRO</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.1 PRO</h1>", unsafe_allow_html=True)
     
     c_in, c_sinal, c_apex = st.columns([1, 1.4, 1])
 
     with c_in:
-        st.markdown("<p class='h-title'>📥 REGISTRO</p>", unsafe_allow_html=True)
+        st.subheader("📥 REGISTRO")
         cartas = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
         h_c = st.selectbox("CASA", cartas)
         a_c = st.selectbox("FORA", cartas)
         
-        if st.button("CONFIRMAR JOGADA", use_container_width=True):
+        if st.button("REGISTRAR JOGADA", use_container_width=True):
             p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
             venc = "Home" if p_map[h_c] > p_map[a_c] else "Away" if p_map[a_c] > p_map[h_c] else "Empate"
+            st.session_state.deck_count[h_c] -= 1; st.session_state.deck_count[a_c] -= 1
             
-            st.session_state.deck_count[h_c] -= 1
-            st.session_state.deck_count[a_c] -= 1
-            
-            # Validação de Lucro
             status = "None"
             if st.session_state.historico and "prev" in st.session_state.historico[0]:
                 st.session_state.total_sinais += 1
                 if venc == st.session_state.historico[0]["prev"]:
-                    status = "Green"; st.session_state.wins_sessao += 1
-                    st.session_state.seq_greens_atual += 1
+                    status = "Green"; st.session_state.wins_sessao += 1; st.session_state.seq_greens_atual += 1
                     st.session_state.maior_seq_greens = max(st.session_state.maior_seq_greens, st.session_state.seq_greens_atual)
                     st.session_state.banca_atual += (st.session_state.banca_atual * 0.01)
                 elif venc != "Empate":
                     status = "Red"; st.session_state.seq_greens_atual = 0
                     st.session_state.banca_atual -= (st.session_state.banca_atual * 0.01)
-
+            
             if venc == "Empate": st.session_state.rodadas_lock = 2
             elif st.session_state.rodadas_lock > 0: st.session_state.rodadas_lock -= 1
             
@@ -110,89 +113,75 @@ if st.session_state.sessao_ativa:
             st.rerun()
 
     with c_sinal:
-        st.markdown("<p class='h-title'>🔮 INTELIGÊNCIA ARTIFICIAL</p>", unsafe_allow_html=True)
-        sinal = analisar_mago_v6(st.session_state.historico)
-        
-        if st.session_state.rodadas_lock > 0:
-            st.warning(f"MESA EM LOCK: {st.session_state.rodadas_lock} RODADAS")
+        st.subheader("🔮 SINAL DE ENTRADA")
+        sinal = analisar_mago_final(st.session_state.historico)
+        if st.session_state.rodadas_lock > 0: st.warning(f"Aguarde mesa estabilizar ({st.session_state.rodadas_lock})")
         elif sinal:
-            cor = "#ef4444" if sinal['sug'] == "Home" else "#3b82f6"
+            cor_txt = "#dc2626" if sinal['sug'] == "Home" else "#2563eb"
             st.markdown(f"""
                 <div class="card-sinal-on">
-                    <h3 style="margin:0; color:#10b981;">OPORTUNIDADE DETECTADA</h3>
-                    <small>{sinal['est']}</small>
-                    <h1 style="color:{cor}; font-size:80px; margin:10px 0;">{sinal['sug'].upper()}</h1>
-                    <p style="font-size:18px;">CONFIANÇA: <b>{sinal['conf']}%</b></p>
+                    <h2 style="color:#1e293b; margin:0;">ENTRADA CONFIRMADA</h2>
+                    <p style="color:#64748b;">Estratégia: {sinal['est']}</p>
+                    <h1 style="color:{cor_txt}; font-size:90px; margin:10px 0;">{sinal['sug'].upper()}</h1>
+                    <h3 style="color:#1e293b;">CONFIANÇA: {sinal['conf']}%</h3>
                 </div>
             """, unsafe_allow_html=True)
             st.session_state.historico[0]["prev"] = sinal['sug']
-        else:
-            st.info("Varrendo Roadmap em busca de brechas...")
+        else: st.info("Escaneando padrões...")
 
     with c_apex:
-        st.markdown("<p class='h-title'>🛰️ GLOBAL STATUS</p>", unsafe_allow_html=True)
+        st.subheader("🛰️ STATUS")
         lucro = st.session_state.banca_atual - st.session_state.banca_inicial
         st.markdown(f"""
-            <div class="monitor-item">💰 <b>SALDO:</b> R$ {st.session_state.banca_atual:.2f}</div>
-            <div class="monitor-item">📈 <b>LUCRO:</b> R$ {lucro:.2f}</div>
-            <div class="monitor-item">🔥 <b>STREAK ATUAL:</b> {st.session_state.seq_greens_atual} GREENS</div>
+            <div class="monitor-item">💰 SALDO: R$ {st.session_state.banca_atual:.2f}</div>
+            <div class="monitor-item" style="color:#16a34a !important;">📈 LUCRO: R$ {lucro:.2f}</div>
+            <div class="monitor-item">🔥 SEQUÊNCIA: {st.session_state.seq_greens_atual} ✅</div>
         """, unsafe_allow_html=True)
-        if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True):
-            st.session_state.sessao_ativa = False
-            st.rerun()
+        if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True): st.session_state.sessao_active = False
 
     st.divider()
     
-    # --- ÁREA DE TENDÊNCIA (O QUE VOCÊ CIRCULOU) ---
+    # SCANNER DE PREDOMINÂNCIA (ALTO CONTRASTE)
     if st.session_state.historico:
-        st.markdown("<p class='h-title' style='text-align:center;'>🔍 SCANNER DE PREDOMINÂNCIA (Últimas 12)</p>", unsafe_allow_html=True)
+        st.subheader("🔍 SCANNER DE CARTAS (Últimas 12)")
         col_h, col_a = st.columns(2)
         ultimas_12 = st.session_state.historico[:12]
-        
         with col_h:
             cat_h = [h['cat_h'] for h in ultimas_12]
-            st.markdown("<div class='scanner-box'>", unsafe_allow_html=True)
-            st.write("🔴 **CASA (HOME)**")
+            st.markdown("<div class='scanner-box'><h3 style='text-align:center; color:#dc2626 !important;'>CASA (HOME)</h3>", unsafe_allow_html=True)
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Letras", cat_h.count("Letra"))
-            c2.metric("Altas", cat_h.count("Alta"))
-            c3.metric("Neutras", cat_h.count("Neutra"))
-            c4.metric("Baixas", cat_h.count("Baixa"))
+            c1.metric("Letras", cat_h.count("Letra"), delta_color="off")
+            c2.metric("Altas", cat_h.count("Alta"), delta_color="off")
+            c3.metric("Neutras", cat_h.count("Neutra"), delta_color="off")
+            c4.metric("Baixas", cat_h.count("Baixa"), delta_color="off")
             st.markdown("</div>", unsafe_allow_html=True)
-
         with col_a:
             cat_a = [h['cat_a'] for h in ultimas_12]
-            st.markdown("<div class='scanner-box'>", unsafe_allow_html=True)
-            st.write("🔵 **FORA (AWAY)**")
+            st.markdown("<div class='scanner-box'><h3 style='text-align:center; color:#2563eb !important;'>FORA (AWAY)</h3>", unsafe_allow_html=True)
             f1, f2, f3, f4 = st.columns(4)
-            f1.metric("Letras", cat_a.count("Letra"))
-            f2.metric("Altas", cat_a.count("Alta"))
-            f3.metric("Neutras", cat_a.count("Neutra"))
-            f4.metric("Baixas", cat_a.count("Baixa"))
+            f1.metric("Letras", cat_a.count("Letra"), delta_color="off")
+            f2.metric("Altas", cat_a.count("Alta"), delta_color="off")
+            f3.metric("Neutras", cat_a.count("Neutra"), delta_color="off")
+            f4.metric("Baixas", cat_a.count("Baixa"), delta_color="off")
             st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
-    
-    # Roadmap tático
     if st.session_state.historico:
         cols = st.columns(12)
         for i, h in enumerate(st.session_state.historico[:12]):
             c = "casa" if h['Vencedor'] == 'Home' else 'fora' if h['Vencedor'] == 'Away' else 'empate'
-            border = "3px solid #22c55e" if h.get('status') == "Green" else "3px solid #ef4444" if h.get('status') == "Red" else "1px solid #334155"
-            cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px'><span class='bola {c}'></span><br><small>{h['H']}x{h['A']}</small></div>", unsafe_allow_html=True)
+            border = "4px solid #16a34a" if h.get('status') == "Green" else "4px solid #dc2626" if h.get('status') == "Red" else "1px solid #94a3b8"
+            cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px; background:white;'><span class='bola {c}'></span><br><b>{h['H']}x{h['A']}</b></div>", unsafe_allow_html=True)
 
 else:
-    # TELA DE RELATÓRIO
-    st.balloons()
+    # TELA DE RELATÓRIO SIMPLIFICADA
     lucro = st.session_state.banca_atual - st.session_state.banca_inicial
     st.markdown(f"""
-        <div style="text-align:center; padding:50px; background:#0f172a; border-radius:20px; border:4px solid #10b981;">
-            <h1 style="color:#10b981;">SESSÃO FINALIZADA COM SUCESSO!</h1>
+        <div style="text-align:center; padding:50px; background:white; border:5px solid #16a34a; border-radius:20px;">
+            <h1 style="color:#16a34a !important;">SESSÃO ENCERRADA</h1>
             <hr>
-            <h2 style="color:white;">💰 LUCRO LÍQUIDO: R$ {lucro:.2f}</h2>
-            <h3 style="color:#94a3b8;">ASSERTIVIDADE: {(st.session_state.wins_sessao/max(1,st.session_state.total_sinais)*100):.1f}%</h3>
-            <p style="font-size:20px;">🔥 Melhor sequência do dia: {st.session_state.maior_seq_greens} GREENS</p>
-            <br>
-            <button onclick="window.location.reload();" style="padding:15px 30px; border-radius:10px; border:none; background:#6366f1; color:white; font-weight:bold; cursor:pointer;">INICIAR NOVA JORNADA</button>
+            <h2>LUCRO LÍQUIDO: R$ {lucro:.2f}</h2>
+            <h3>MELHOR SEQUÊNCIA: {st.session_state.maior_seq_greens} ✅</h3>
+            <p>Clique em Reiniciar no GitHub para voltar.</p>
         </div>
     """, unsafe_allow_html=True)
