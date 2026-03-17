@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 # 1. Configuração de Layout Ultra-Wide
-st.set_page_config(page_title="IA ANALYZER - V6.5 FINAL PRO", layout="wide")
+st.set_page_config(page_title="IA ANALYZER - V6.6 FINAL PRO", layout="wide")
 
 st.markdown("""
 <style>
@@ -52,41 +52,40 @@ def categorizar_carta(carta):
     if carta in ['J', 'Q', 'K', 'A']: return "Letra"
     return "N/A"
 
-def analisar_mago_v6_5(dados):
+def calcular_calor_mesa(historico):
+    if len(historico) < 5: return 50
+    ultimos_sinais = [h.get('status') for h in historico if h.get('status') in ['Green', 'Red']][:10]
+    if not ultimos_sinais: return 50
+    return (ultimos_sinais.count('Green') / len(ultimos_sinais)) * 100
+
+def analisar_mago_v6_6(dados):
     if len(dados) < 5 or st.session_state.rodadas_lock > 0: return None
     v = [h['Vencedor'][0] for h in dados if h.get('Vencedor')]
     v_str = "".join(v[:12])
     p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
     
-    # Força média
     forca_h = sum([p_map.get(h['H'], 0) for h in dados[:3]]) / 3
     forca_a = sum([p_map.get(h['A'], 0) for h in dados[:3]]) / 3
 
-    # PRIORIDADE 1: ESCALAS (FLUXO)
     if v_str.startswith("HHA") and forca_h > 7: return {"sug": "Home", "est": "ESCALA 2x1", "conf": 94}
     if v_str.startswith("AAH") and forca_a > 7: return {"sug": "Away", "est": "ESCALA 2x1", "conf": 94}
     if "HHAAAHH" in v_str or "AAHHHAA" in v_str: return {"sug": "Away" if v[0]=='H' else "Home", "est": "SIMETRIA OCO", "conf": 92}
 
-    # PRIORIDADE 2: QUEBRA DE MÁXIMA (RECALIBRADA)
     seq = 1
     for i in range(len(v)-1):
         if v[i] == v[i+1] and v[i] != 'E': seq += 1
         else: break
     
     if v[0] == 'H' and seq >= 5 and forca_h < 8:
-        if st.session_state.ultima_estratégia != "QUEBRA_H":
-            return {"sug": "Away", "est": "QUEBRA DE MÁXIMA", "conf": 91}
+        if st.session_state.ultima_estratégia != "QUEBRA_H": return {"sug": "Away", "est": "QUEBRA DE MÁXIMA", "conf": 91}
     if v[0] == 'A' and seq >= 5 and forca_a < 8:
-        if st.session_state.ultima_estratégia != "QUEBRA_A":
-            return {"sug": "Home", "est": "QUEBRA DE MÁXIMA", "conf": 91}
-
+        if st.session_state.ultima_estratégia != "QUEBRA_A": return {"sug": "Home", "est": "QUEBRA DE MÁXIMA", "conf": 91}
     return None
 
 # --- INTERFACE ---
 if st.session_state.sessao_ativa:
-    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.5 PRO</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.6 PRO</h1>", unsafe_allow_html=True)
     
-    # GESTÃO NO TOPO
     col_g1, col_g2, col_g3, col_g4 = st.columns([1, 1, 1, 1])
     with col_g1: st.session_state.banca_inicial = st.number_input("BANCA INICIAL (R$)", value=float(st.session_state.banca_inicial), step=50.0)
     with col_g2: st.session_state.banca_atual = st.number_input("SALDO ATUAL (R$)", value=float(st.session_state.banca_atual), step=10.0)
@@ -107,7 +106,6 @@ if st.session_state.sessao_ativa:
             p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
             venc = "Home" if p_map[h_c] > p_map[a_c] else "Away" if p_map[a_c] > p_map[h_c] else "Empate"
             st.session_state.deck_count[h_c] -= 1; st.session_state.deck_count[a_c] -= 1
-            
             status = "None"
             risco = 0.005 if "CALMA" in perfil else 0.01 if "MODERADA" in perfil else 0.025
             if st.session_state.historico and "prev" in st.session_state.historico[0]:
@@ -118,7 +116,6 @@ if st.session_state.sessao_ativa:
                     st.session_state.banca_atual += (st.session_state.banca_atual * risco); st.session_state.ultima_estratégia = ""
                 elif venc != "Empate":
                     status = "Red"; st.session_state.seq_greens_atual = 0; st.session_state.banca_atual -= (st.session_state.banca_atual * risco)
-            
             if venc == "Empate": st.session_state.rodadas_lock = 2
             elif st.session_state.rodadas_lock > 0: st.session_state.rodadas_lock -= 1
             st.session_state.historico.insert(0, {"Vencedor": venc, "H": h_c, "A": a_c, "status": status, "cat_h": categorizar_carta(h_c), "cat_a": categorizar_carta(a_c)})
@@ -126,7 +123,7 @@ if st.session_state.sessao_ativa:
 
     with c_sinal:
         st.subheader("🔮 SINAL")
-        sinal = analisar_mago_v6_5(st.session_state.historico)
+        sinal = analisar_mago_v6_6(st.session_state.historico)
         if st.session_state.rodadas_lock > 0: st.warning(f"Aguarde mesa ({st.session_state.rodadas_lock})")
         elif sinal:
             cor = "#dc2626" if sinal['sug'] == "Home" else "#2563eb"
@@ -137,6 +134,12 @@ if st.session_state.sessao_ativa:
 
     with c_apex:
         st.subheader("🛰️ STATUS")
+        calor = calcular_calor_mesa(st.session_state.historico)
+        st.write(f"📊 **Calor da Mesa:** {calor:.0f}%")
+        if calor >= 70: st.success("Mesa Altamente Pagadora"); st.progress(calor/100)
+        elif calor >= 40: st.warning("Mesa Neutra / Estável"); st.progress(calor/100)
+        else: st.error("Mesa Recolhedora - PARE!"); st.progress(calor/100)
+        
         lucro = st.session_state.banca_atual - st.session_state.banca_inicial
         st.markdown(f"""
             <div class="monitor-item">💰 SALDO ATUAL: R$ {st.session_state.banca_atual:.2f}</div>
@@ -146,7 +149,6 @@ if st.session_state.sessao_ativa:
 
     st.divider()
 
-    # --- SCANNER DE CARTAS (ÁREA QUE VOCÊ CIRCULOU) ---
     if st.session_state.historico:
         st.subheader("🔍 SCANNER DE CARTAS (Últimas 12)")
         col_h, col_a = st.columns(2)
@@ -172,7 +174,6 @@ if st.session_state.sessao_ativa:
 
     st.divider()
     
-    # --- ROADMAP TÁTICO ---
     if st.session_state.historico:
         st.subheader("🕒 ROADMAP TÁTICO")
         cols = st.columns(12)
@@ -182,7 +183,6 @@ if st.session_state.sessao_ativa:
             cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px; background:white;'><span class='bola {c}'></span><br><b>{h['H']}x{h['A']}</b></div>", unsafe_allow_html=True)
 
 else:
-    # TELA DE RELATÓRIO
     lucro = st.session_state.banca_atual - st.session_state.banca_inicial
     st.markdown(f"""
         <div style="text-align:center; padding:50px; background:white; border:5px solid #16a34a; border-radius:20px;">
