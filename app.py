@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 # 1. Configuração de Layout
-st.set_page_config(page_title="IA ANALYZER - V6.2 PRO", layout="wide")
+st.set_page_config(page_title="IA ANALYZER - V6.3 PRO", layout="wide")
 
 st.markdown("""
 <style>
@@ -17,13 +17,13 @@ st.markdown("""
     }
     h1, h2, h3, p, span { color: #1e293b !important; }
     .monitor-item { 
-        background-color: #ffffff; padding: 15px; border-radius: 10px; 
-        margin-bottom: 10px; border: 2px solid #e2e8f0;
-        font-weight: bold; font-size: 18px;
+        background-color: #ffffff; padding: 10px; border-radius: 10px; 
+        margin-bottom: 8px; border: 2px solid #6366f1;
+        font-weight: bold; font-size: 16px;
     }
     .scanner-box { 
         background-color: #ffffff; padding: 20px; border-radius: 12px; 
-        border: 2px solid #cbd5e1; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        border: 2px solid #cbd5e1;
     }
     .bola { height: 14px; width: 14px; border-radius: 50%; display: inline-block; margin: 0 3px; border: 1px solid #94a3b8; }
     .casa { background-color: #dc2626; } 
@@ -33,15 +33,10 @@ st.markdown("""
         background-color: #1e293b !important; color: white !important;
         font-weight: bold !important; border-radius: 8px !important;
     }
-    /* Estilo para as caixas de input de banca no topo */
-    .banca-input-box {
-        background-color: #ffffff; padding: 15px; border-radius: 10px;
-        border: 2px solid #6366f1; margin-bottom: 20px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Inicialização de Memória Permanente
+# 2. Inicialização de Memória
 for key in ['historico', 'banca_inicial', 'banca_atual', 'max_seq_home', 'max_seq_away', 'rodadas_lock', 
             'wins_sessao', 'total_sinais', 'sessao_ativa', 'seq_greens_atual', 'maior_seq_greens', 'deck_count']:
     if key not in st.session_state:
@@ -75,16 +70,20 @@ def analisar_mago_final(dados):
 
 # --- INTERFACE ---
 if st.session_state.sessao_ativa:
-    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.2 PRO</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.3 PRO</h1>", unsafe_allow_html=True)
     
-    # NOVA ÁREA DE GESTÃO NO TOPO (A PEDIDO)
-    col_gestao1, col_gestao2, col_gestao3 = st.columns([1, 1, 1.4])
+    # ÁREA DE GESTÃO NO TOPO (COM SALDO MODIFICÁVEL)
+    col_gestao1, col_gestao2, col_gestao3, col_gestao4 = st.columns([1, 1, 1, 1])
     with col_gestao1:
-        st.session_state.banca_inicial = st.number_input("VALOR DA BANCA (R$)", value=float(st.session_state.banca_inicial), step=100.0)
+        st.session_state.banca_inicial = st.number_input("BANCA INICIAL (R$)", value=float(st.session_state.banca_inicial), step=50.0)
     with col_gestao2:
-        perfil = st.selectbox("MODO DE JOGO", ["CALMA (0.5%)", "MODERADA (1%)", "ATACANTE (2.5%)"], index=1)
+        # SALDO ATUAL AGORA É EDITÁVEL PELO USUÁRIO
+        novo_saldo = st.number_input("SALDO ATUAL (R$)", value=float(st.session_state.banca_atual), step=10.0)
+        st.session_state.banca_atual = novo_saldo
     with col_gestao3:
-        st.write("") # Alinhamento
+        perfil = st.selectbox("MODO DE JOGO", ["CALMA (0.5%)", "MODERADA (1%)", "ATACANTE (2.5%)"], index=1)
+    with col_gestao4:
+        st.write("") # Espaçamento
         if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True):
             st.session_state.sessao_ativa = False
             st.rerun()
@@ -144,7 +143,7 @@ if st.session_state.sessao_ativa:
         st.subheader("🛰️ STATUS")
         lucro = st.session_state.banca_atual - st.session_state.banca_inicial
         st.markdown(f"""
-            <div class="monitor-item">💰 SALDO: R$ {st.session_state.banca_atual:.2f}</div>
+            <div class="monitor-item" style="border-color:#16a34a;">💰 SALDO ATUAL: R$ {st.session_state.banca_atual:.2f}</div>
             <div class="monitor-item" style="color:#16a34a !important;">📈 LUCRO: R$ {lucro:.2f}</div>
             <div class="monitor-item">🔥 SEQUÊNCIA: {st.session_state.seq_greens_atual} ✅</div>
         """, unsafe_allow_html=True)
@@ -183,7 +182,6 @@ if st.session_state.sessao_ativa:
             cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px; background:white;'><span class='bola {c}'></span><br><b>{h['H']}x{h['A']}</b></div>", unsafe_allow_html=True)
 
 else:
-    # TELA DE RELATÓRIO
     lucro = st.session_state.banca_atual - st.session_state.banca_inicial
     st.markdown(f"""
         <div style="text-align:center; padding:50px; background:white; border:5px solid #16a34a; border-radius:20px;">
@@ -191,9 +189,5 @@ else:
             <hr>
             <h2>LUCRO LÍQUIDO: R$ {lucro:.2f}</h2>
             <h3>MELHOR SEQUÊNCIA: {st.session_state.maior_seq_greens} ✅</h3>
-            <p>Clique no botão 'REINICIAR APP' na barra lateral para voltar.</p>
         </div>
     """, unsafe_allow_html=True)
-    if st.sidebar.button("🔄 REINICIAR APP"):
-        st.session_state.clear()
-        st.rerun()
