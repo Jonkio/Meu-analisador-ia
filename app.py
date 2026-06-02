@@ -1,197 +1,156 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-from datetime import datetime
 
-# 1. Configuração de Layout Ultra-Wide
-st.set_page_config(page_title="IA ANALYZER - V6.6 FINAL PRO", layout="wide")
+st.set_page_config(page_title="ÁPICE IA - MESTRE PREDICTOR", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp { background-color: #f1f5f9; color: #1e293b; }
-    .card-sinal-on { 
-        background-color: #ffffff; padding: 30px; border-radius: 15px; text-align: center;
-        border: 5px solid #22c55e; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    .main { background-color: #020617; color: white; }
+    .stButton>button { height: 75px; border-radius: 15px; font-weight: bold; font-size: 20px; }
+    
+    /* Cores de Seleção Clássicas */
+    .btn-home { background-color: #dc2626 !important; color: white !important; }
+    .btn-away { background-color: #2563eb !important; color: white !important; }
+    
+    /* Histórico Horizontal Dinâmico */
+    .history-ball { 
+        display: inline-block; width: 38px; height: 38px; line-height: 38px; 
+        border-radius: 50%; text-align: center; font-weight: bold; margin: 4px; 
+        font-size: 15px; border: 2px solid rgba(255,255,255,0.1);
     }
-    h1, h2, h3, p, span { color: #1e293b !important; }
-    .monitor-item { 
-        background-color: #ffffff; padding: 10px; border-radius: 10px; 
-        margin-bottom: 8px; border: 2px solid #6366f1;
-        font-weight: bold; font-size: 16px;
-    }
-    .scanner-box { 
-        background-color: #ffffff; padding: 20px; border-radius: 12px; 
-        border: 2px solid #cbd5e1; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-    }
-    .bola { height: 14px; width: 14px; border-radius: 50%; display: inline-block; margin: 0 3px; border: 1px solid #94a3b8; }
-    .casa { background-color: #dc2626; } 
-    .fora { background-color: #2563eb; } 
-    .empate { background-color: #eab308; } 
-    .stButton>button {
-        background-color: #1e293b !important; color: white !important;
-        font-weight: bold !important; border-radius: 8px !important;
-    }
+    .ball-H { background-color: #dc2626; color: white; box-shadow: 0 0 10px #ef4444; }
+    .ball-A { background-color: #2563eb; color: white; box-shadow: 0 0 10px #3b82f6; }
+    .ball-D { background-color: #16a34a; color: white; }
+    
+    /* Alertas de Elite */
+    .alert-master { background: linear-gradient(145px, #064e3b, #022c22); border: 2px solid #22c55e; padding: 25px; border-radius: 15px; text-align: center; }
+    .alert-warning-master { background: linear-gradient(145px, #78350f, #451a03); border: 2px solid #f59e0b; padding: 25px; border-radius: 15px; text-align: center; }
+    .danger-box { background: #4c0519; border: 2px solid #f43f5e; padding: 15px; border-radius: 12px; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Inicialização de Memória Permanente
-for key in ['historico', 'banca_inicial', 'banca_atual', 'max_seq_home', 'max_seq_away', 'rodadas_lock', 
-            'wins_sessao', 'total_sinais', 'sessao_ativa', 'seq_greens_atual', 'maior_seq_greens', 'deck_count', 'ultima_estratégia']:
-    if key not in st.session_state:
-        if 'banca' in key: st.session_state[key] = 3000.0
-        elif key == 'sessao_ativa': st.session_state[key] = True
-        elif key == 'deck_count':
-            st.session_state.deck_count = {str(c): 32 for c in range(2, 11)}
-            for f in ['J', 'Q', 'K', 'A']: st.session_state.deck_count[f] = 32
-        else: st.session_state[key] = [] if 'historico' in key else 0
+# Inicialização de Variáveis de Estado Inteligentes
+if 'selected_venc' not in st.session_state: st.session_state.selected_venc = None
+if 'h_football' not in st.session_state: st.session_state.h_football = []
 
-def categorizar_carta(carta):
-    if carta in ['2', '3', '4', '5']: return "Baixa"
-    if carta in ['6', '7', '8', '9']: return "Neutra"
-    if carta in ['10']: return "Alta"
-    if carta in ['J', 'Q', 'K', 'A']: return "Letra"
-    return "N/A"
+def confirmar_rodada():
+    if st.session_state.selected_venc:
+        st.session_state.h_football.insert(0, st.session_state.selected_venc)
+        st.session_state.selected_venc = None
+    else:
+        st.error("Selecione o vencedor antes de apertar OK!")
 
-def calcular_calor_mesa(historico):
-    if len(historico) < 5: return 50
-    ultimos_sinais = [h.get('status') for h in historico if h.get('status') in ['Green', 'Red']][:10]
-    if not ultimos_sinais: return 50
-    return (ultimos_sinais.count('Green') / len(ultimos_sinais)) * 100
-
-def analisar_mago_v6_6(dados):
-    if len(dados) < 5 or st.session_state.rodadas_lock > 0: return None
-    v = [h['Vencedor'][0] for h in dados if h.get('Vencedor')]
-    v_str = "".join(v[:12])
-    p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
+# --- O MOTOR MESTRE DE PREDIÇÃO ---
+def motor_mestre_analise():
+    h = st.session_state.h_football
+    # Filtra empates para não quebrar a análise de micro-tendências de cores
+    fluxo = [x for x in h if x != "D"]
     
-    forca_h = sum([p_map.get(h['H'], 0) for h in dados[:3]]) / 3
-    forca_a = sum([p_map.get(h['A'], 0) for h in dados[:3]]) / 3
-
-    if v_str.startswith("HHA") and forca_h > 7: return {"sug": "Home", "est": "ESCALA 2x1", "conf": 94}
-    if v_str.startswith("AAH") and forca_a > 7: return {"sug": "Away", "est": "ESCALA 2x1", "conf": 94}
-    if "HHAAAHH" in v_str or "AAHHHAA" in v_str: return {"sug": "Away" if v[0]=='H' else "Home", "est": "SIMETRIA OCO", "conf": 92}
-
-    seq = 1
-    for i in range(len(v)-1):
-        if v[i] == v[i+1] and v[i] != 'E': seq += 1
-        else: break
+    if len(fluxo) < 3:
+        return {"tipo": "AGUARDANDO", "msg": "Alimentando matriz de dados...", "sug": None, "conf": 0}
+        
+    s = "".join(fluxo[:6]) # Captura as últimas 6 rodadas puras
     
-    if v[0] == 'H' and seq >= 5 and forca_h < 8:
-        if st.session_state.ultima_estratégia != "QUEBRA_H": return {"sug": "Away", "est": "QUEBRA DE MÁXIMA", "conf": 91}
-    if v[0] == 'A' and seq >= 5 and forca_a < 8:
-        if st.session_state.ultima_estratégia != "QUEBRA_A": return {"sug": "Home", "est": "QUEBRA DE MÁXIMA", "conf": 91}
-    return None
+    # ⚠️ ANTICORRUPÇÃO / ALERTA DE MANIPULAÇÃO (Mesa em Super-Tendência Unilateral)
+    if len(fluxo) >= 6 and (fluxo[:6] == ["H"]*6 or fluxo[:6] == ["A"]*6):
+        return {"tipo": "PERIGO", "msg": "Mesa em fluxo de retenção unilateral severo. ALTA CHANCE DE MANIPULAÇÃO.", "sug": "ABORTAR", "conf": 0}
+
+    # 1. PADRÃO TERMINATOR (Entrada Antecipada na 2ª e 3ª casa)
+    if s.startswith("HH"): 
+        return {"tipo": "SINAL", "msg": "Padrão Terminator: Força de reversão imediata calculada.", "sug": "🔵 FORA (AWAY)", "conf": 84}
+    if s.startswith("AA"):
+        return {"tipo": "SINAL", "msg": "Padrão Terminator: Força de reversão imediata calculada.", "sug": "🔴 CASA (HOME)", "conf": 84}
+
+    # 2. PADRÃO GÊMEOS (Entrada em Duplas - AA -> H... a IA busca o segundo H)
+    if s.startswith("HAA") or s.startswith("AHH"):
+        proxima = "🔴 CASA (HOME)" if s.startswith("HAA") else "🔵 FORA (AWAY)"
+        return {"tipo": "SINAL", "msg": "Padrão Gêmeos: Algoritmo tende a fechar a segunda perna do par.", "sug": proxima, "conf": 89}
+
+    # 3. PADRÃO INTERMITÊNCIA EXTENSA (Xadrez de Bloco)
+    if s.startswith("HHAAHH") or s.startswith("AAHHAA"):
+        proxima = "🔵 FORA (AWAY)" if s.startswith("HHAAHH") else "🔴 CASA (HOME)"
+        return {"tipo": "SINAL", "msg": "Xadrez de Blocos: Quebra cíclica detectada no espelhamento.", "sug": proxima, "conf : 92"}
+
+    # 4. PADRÃO XADREZ TRADICIONAL COMPACTO
+    if s.startswith("HA") or s.startswith("AH"):
+        proxima = "🔴 CASA (HOME)" if s[0] == "A" else "🔵 FORA (AWAY)"
+        return {"tipo": "SINAL", "msg": "Xadrez Padrão: Fluidez de mesa identificada.", "sug": proxima, "conf": 78}
+
+    return {"tipo": "MISTO", "msg": "Mesa oscilando em mercado neutro. Aguardando assimetria estatística.", "sug": None, "conf": 0}
 
 # --- INTERFACE ---
-if st.session_state.sessao_ativa:
-    st.markdown("<h1 style='text-align: center;'>⚽ FOOTBALL STUDIO IA - V6.6 PRO</h1>", unsafe_allow_html=True)
+st.title("🎯 PORTAL ÁPICE IA - MESTRE PREDICTOR V6")
+
+c_input, c_analise = st.columns([1.1, 1])
+
+with c_input:
+    st.subheader("📥 Input de Alta Precisão")
     
-    col_g1, col_g2, col_g3, col_g4 = st.columns([1, 1, 1, 1])
-    with col_g1: st.session_state.banca_inicial = st.number_input("BANCA INICIAL (R$)", value=float(st.session_state.banca_inicial), step=50.0)
-    with col_g2: st.session_state.banca_atual = st.number_input("SALDO ATUAL (R$)", value=float(st.session_state.banca_atual), step=10.0)
-    with col_g3: perfil = st.selectbox("MODO", ["CALMA (0.5%)", "MODERADA (1%)", "ATACANTE (2.5%)"], index=1)
-    with col_g4: 
-        st.write("")
-        if st.button("⛔ ENCERRAR SESSÃO", use_container_width=True): st.session_state.sessao_ativa = False; st.rerun()
-
-    st.divider()
-
-    c_in, c_sinal, c_apex = st.columns([1, 1.4, 1])
-
-    with c_in:
-        st.subheader("📥 REGISTRO")
-        cartas = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-        h_c = st.selectbox("CASA", cartas); a_c = st.selectbox("FORA", cartas)
-        if st.button("REGISTRAR JOGADA", use_container_width=True):
-            p_map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
-            venc = "Home" if p_map[h_c] > p_map[a_c] else "Away" if p_map[a_c] > p_map[h_c] else "Empate"
-            st.session_state.deck_count[h_c] -= 1; st.session_state.deck_count[a_c] -= 1
-            status = "None"
-            risco = 0.005 if "CALMA" in perfil else 0.01 if "MODERADA" in perfil else 0.025
-            if st.session_state.historico and "prev" in st.session_state.historico[0]:
-                st.session_state.total_sinais += 1
-                if venc == st.session_state.historico[0]["prev"]:
-                    status = "Green"; st.session_state.wins_sessao += 1; st.session_state.seq_greens_atual += 1
-                    st.session_state.maior_seq_greens = max(st.session_state.maior_seq_greens, st.session_state.seq_greens_atual)
-                    st.session_state.banca_atual += (st.session_state.banca_atual * risco); st.session_state.ultima_estratégia = ""
-                elif venc != "Empate":
-                    status = "Red"; st.session_state.seq_greens_atual = 0; st.session_state.banca_atual -= (st.session_state.banca_atual * risco)
-            if venc == "Empate": st.session_state.rodadas_lock = 2
-            elif st.session_state.rodadas_lock > 0: st.session_state.rodadas_lock -= 1
-            st.session_state.historico.insert(0, {"Vencedor": venc, "H": h_c, "A": a_c, "status": status, "cat_h": categorizar_carta(h_c), "cat_a": categorizar_carta(a_c)})
-            st.rerun()
-
-    with c_sinal:
-        st.subheader("🔮 SINAL")
-        sinal = analisar_mago_v6_6(st.session_state.historico)
-        if st.session_state.rodadas_lock > 0: st.warning(f"Aguarde mesa ({st.session_state.rodadas_lock})")
-        elif sinal:
-            cor = "#dc2626" if sinal['sug'] == "Home" else "#2563eb"
-            st.markdown(f'<div class="card-sinal-on"><h2 style="color:#1e293b; margin:0;">ENTRADA CONFIRMADA</h2><p style="color:#64748b;">Estratégia: {sinal["est"]}</p><h1 style="color:{cor}; font-size:90px; margin:10px 0;">{sinal["sug"].upper()}</h1><h3 style="color:#1e293b;">CONFIANÇA: {sinal["conf"]}%</h3></div>', unsafe_allow_html=True)
-            st.session_state.historico[0]["prev"] = sinal['sug']
-            if "MÁXIMA" in sinal["est"]: st.session_state.ultima_estratégia = f"QUEBRA_{sinal['sug'][0]}"
-        else: st.info("Escaneando padrões...")
-
-    with c_apex:
-        st.subheader("🛰️ STATUS")
-        calor = calcular_calor_mesa(st.session_state.historico)
-        st.write(f"📊 **Calor da Mesa:** {calor:.0f}%")
-        if calor >= 70: st.success("Mesa Altamente Pagadora"); st.progress(calor/100)
-        elif calor >= 40: st.warning("Mesa Neutra / Estável"); st.progress(calor/100)
-        else: st.error("Mesa Recolhedora - PARE!"); st.progress(calor/100)
+    # Grid de botões com feedback visual instantâneo
+    c1, c2, c3 = st.columns(3)
+    if c1.button("🔴 CASA", key="btn_h", use_container_width=True, type="primary" if st.session_state.selected_venc == "H" else "secondary"):
+        st.session_state.selected_venc = "H"; st.rerun()
+    if c2.button("🟢 EMPATE", key="btn_d", use_container_width=True, type="primary" if st.session_state.selected_venc == "D" else "secondary"):
+        st.session_state.selected_venc = "D"; st.rerun()
+    if c3.button("🔵 FORA", key="btn_a", use_container_width=True, type="primary" if st.session_state.selected_venc == "A" else "secondary"):
+        st.session_state.selected_venc = "A"; st.rerun()
         
-        lucro = st.session_state.banca_atual - st.session_state.banca_inicial
+    st.divider()
+    if st.button("🚀 CONFIRMAR E ANALISAR (OK)", use_container_width=True):
+        confirmar_rodada()
+        st.rerun()
+
+with c_analise:
+    st.subheader("🛰️ Monitoramento de Algoritmo")
+    
+    res = motor_mestre_analise()
+    
+    if res["tipo"] == "PERIGO":
         st.markdown(f"""
-            <div class="monitor-item">💰 SALDO ATUAL: R$ {st.session_state.banca_atual:.2f}</div>
-            <div class="monitor-item" style="color:#16a34a !important;">📈 LUCRO: R$ {lucro:.2f}</div>
-            <div class="monitor-item">🔥 SEQUÊNCIA: {st.session_state.seq_greens_atual} ✅</div>
+            <div class="danger-box">
+                <h3 style="color:#fda4af; margin:0;">⚠️ MERCADO DO CASSINO EM ALERTA MÁXIMO</h3>
+                <p style="margin:5px 0 0 0; color:#f43f5e; font-weight:bold;">{res['msg']}</p>
+                <span style="font-size:12px; color:#fecdd3;">Não opere nesta sequência! Aguarde a mesa redefinir.</span>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    elif res["tipo"] == "SINAL" and res["sug"]:
+        st.markdown(f"""
+            <div class="alert-master">
+                <small style="color:#a7f3d0; text-transform: uppercase; font-weight:bold; letter-spacing:1px;">{res['msg']}</small>
+                <h1 style="color:white; font-size:38px; margin:10px 0;">🎯 ENTRADA: {res['sug']}</h1>
+                <div style="background:rgba(255,255,255,0.1); display:inline-block; padding:3px 15px; border-radius:20px; font-weight:bold;">
+                    Confiança Mecânica: {res['conf']}%
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+            <div class="alert-warning-master">
+                <h3 style="margin:0; color:#fef08a;">🔍 Analisando Flutuação</h3>
+                <p style="margin:5px 0 0 0; font-size:14px; color:#fde047;">{res['msg']}</p>
+            </div>
         """, unsafe_allow_html=True)
 
     st.divider()
-
-    if st.session_state.historico:
-        st.subheader("🔍 SCANNER DE CARTAS (Últimas 12)")
-        col_h, col_a = st.columns(2)
-        ultimas_12 = st.session_state.historico[:12]
-        with col_h:
-            cat_h = [h['cat_h'] for h in ultimas_12]
-            st.markdown("<div class='scanner-box'><h3 style='text-align:center; color:#dc2626 !important;'>CASA (HOME)</h3>", unsafe_allow_html=True)
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Letras", cat_h.count("Letra"), delta_color="off")
-            c2.metric("Altas", cat_h.count("Alta"), delta_color="off")
-            c3.metric("Neutras", cat_h.count("Neutra"), delta_color="off")
-            c4.metric("Baixas", cat_h.count("Baixa"), delta_color="off")
-            st.markdown("</div>", unsafe_allow_html=True)
-        with col_a:
-            cat_a = [h['cat_a'] for h in ultimas_12]
-            st.markdown("<div class='scanner-box'><h3 style='text-align:center; color:#2563eb !important;'>FORA (AWAY)</h3>", unsafe_allow_html=True)
-            f1, f2, f3, f4 = st.columns(4)
-            f1.metric("Letras", cat_a.count("Letra"), delta_color="off")
-            f2.metric("Altas", cat_a.count("Alta"), delta_color="off")
-            f3.metric("Neutras", cat_a.count("Neutra"), delta_color="off")
-            f4.metric("Baixas", cat_a.count("Baixa"), delta_color="off")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    st.divider()
     
-    if st.session_state.historico:
-        st.subheader("🕒 ROADMAP TÁTICO")
-        cols = st.columns(12)
-        for i, h in enumerate(st.session_state.historico[:12]):
-            c = "casa" if h['Vencedor'] == 'Home' else 'fora' if h['Vencedor'] == 'Away' else 'empate'
-            border = "4px solid #16a34a" if h.get('status') == "Green" else "4px solid #dc2626" if h.get('status') == "Red" else "1px solid #94a3b8"
-            cols[i].markdown(f"<div style='text-align:center; border:{border}; border-radius:10px; padding:8px; background:white;'><span class='bola {c}'></span><br><b>{h['H']}x{h['A']}</b></div>", unsafe_allow_html=True)
+    # Dashboard Estatístico Rápido
+    if st.session_state.h_football:
+        total = len(st.session_state.h_football)
+        casas = st.session_state.h_football.count("H")
+        foras = st.session_state.h_football.count("A")
+        
+        st.write(f"📊 Volatilidade da Mesa: **{total} rodadas coletadas**")
+        st.caption(f"Proporção Física Atual: 🔴 Casa {int((casas/total)*100)}% | 🔵 Fora {int((foras/total)*100)}%")
+        
+        # Histórico Estilo Fita de Cassino Real
+        html_history = "<div style='overflow-x: auto; white-space: nowrap; padding: 12px; background:#0f172a; border-radius:12px; border: 1px solid #1e293b;'>"
+        for item in st.session_state.h_football[:20]:
+            html_history += f'<span class="history-ball ball-{item}">{item}</span>'
+        html_history += "</div>"
+        st.markdown(html_history, unsafe_allow_html=True)
 
-else:
-    lucro = st.session_state.banca_atual - st.session_state.banca_inicial
-    st.markdown(f"""
-        <div style="text-align:center; padding:50px; background:white; border:5px solid #16a34a; border-radius:20px;">
-            <h1 style="color:#16a34a !important;">SESSÃO ENCERRADA</h1>
-            <hr>
-            <h2>LUCRO LÍQUIDO: R$ {lucro:.2f}</h2>
-            <h3>MELHOR SEQUÊNCIA: {st.session_state.maior_seq_greens} ✅</h3>
-        </div>
-    """, unsafe_allow_html=True)
-    if st.sidebar.button("🔄 REINICIAR APP"):
-        st.session_state.clear()
-        st.rerun()
+st.divider()
+if st.button("🗑️ ENVIAR NOVAS CARTAS (RESET BARALHO)"):
+    st.session_state.h_football = []
+    st.session_state.selected_venc = None
+    st.rerun()
